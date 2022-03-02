@@ -1,10 +1,12 @@
-(function(document) {
+(function() {
   'use strict';
 
   window.CellsPolymer.start({
     routes: {
-      'goal': '/',
-      'data': '/data'
+      'login': '/',
+      'dashboard': '/dashboard',
+      'movement-detail': '/movement/:id/:label',
+      'help': '/help'
     }
   });
-}(document));
+}());

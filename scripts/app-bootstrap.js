@@ -48,14 +48,8 @@
     }
   };
 
-  window.AppConfig = {"deployEndpoint":"","i18nPath":"locales/","componentsPath":"./bower_components/","composerEndpoint":"./composerMocks/","pagesPath":"pages/","appId":"","debug":true,"mocks":true,"coreCache":true,"routerLog":false,"cordovaScript":"cordova.js","prplLevel":1,"initialBundle":["goal"],"transpile":true,"transpileExclude":["webcomponentsjs","moment","d3","bgadp*"],"enableLitElement":true,"onlyLitElements":true,"engine":"polymer","once":true,"pageDefinitions":[{"name":"data","adapter":"litElement","type":"static","hasModules":false},{"name":"goal","adapter":"litElement","type":"static","hasModules":false}],"pages":["data","goal"]};
+  window.AppConfig = {"enableLitElement":true,"onlyLitElements":true,"transpile":true,"transpileExclude":["webcomponentsjs","moment","d3","bgadp*"],"debug":true,"logs":false,"templatesPath":"./dynamicPages/","pagesPath":"pages/","prplLevel":1,"initialBundle":["login"],"locales":{"languages":["es-ES","en-US","es"],"intlInputFileNames":["locales"],"intlFileName":"locales"},"mock":true,"engine":"polymer","once":true,"componentsPath":"./bower_components/","deployEndpoint":"","pageDefinitions":[{"name":"dashboard","adapter":"litElement","type":"static","hasModules":false},{"name":"help","adapter":"litElement","type":"static","hasModules":false},{"name":"login","adapter":"litElement","type":"static","hasModules":false},{"name":"movement-detail","adapter":"litElement","type":"static","hasModules":false}],"pages":["dashboard","help","login","movement-detail"]};
   window.AppComposerConfig = {};
-
-  function updateCache() {
-    if (window.applicationCache.status === window.applicationCache.UPDATEREADY) {
-      window.applicationCache.swapCache();
-    }
-  }
 
   function removeSplashScreen() {
     var loadEl = document.getElementById('splash');
@@ -161,37 +155,54 @@
     import('./lit-components.js').then(()=> typeof(cb) === 'function' ? cb() : '' );
   }
 
-  function loadInitialLitComponents(cb) {
+  function loadInitialLitElementComponents(cb) {
     if (window.AppConfig.onlyLitElements && window.AppConfig.devmode) {
       _importScript(window.AppConfig.deployEndpoint + 'scripts/lit-initial-components.js', cb, true);
     } else {
       if (window.AppConfig.bundles) {
         loadFirstScripts(cb);
       } else {
-        loadFirstBundle(cb);
+        if (window.AppConfig.onlyLitElements) {
+          loadFirstBundle(cb);
+        } else {
+          _importHtmlWithModules(window.AppConfig.deployEndpoint + 'lit-initial-components.html', 'lit-initial-components-loaded', cb);
+        }
       }
     }
   }
 
-  function loadAppLitComponents(cb) {
+  function _importHtmlWithModules(url, eventName, cb) {
+    var nextBundle = document.createElement('link');
+    nextBundle.rel = 'import';
+    nextBundle.href = url;
+    nextBundle.addEventListener('error', onScriptLoadError(nextBundle.href, cb));
+    document.body.addEventListener(eventName, cb, { once: true });
+    document.head.appendChild(nextBundle);
+  }
+
+  function loadAppLitComponents(cb)  {
     if (window.AppConfig.onlyLitElements && window.AppConfig.devmode) {
       _importScript(window.AppConfig.deployEndpoint + 'scripts/lit-components.js', cb, true);
     } else {
       if (window.AppConfig.bundles) {
         loadRestScripts(cb);
       } else {
-        loadRestBundle(cb);
+        if (window.AppConfig.onlyLitElements) {
+          loadRestBundle(cb);
+        } else {
+          _importHtml(window.AppConfig.deployEndpoint + 'lit-components.html', cb, true);
+        }
       }
     }
   }
 
   function loadInitialElements() {
     if (window.AppConfig.onlyLitElements) {
-      loadInitialLitComponents(continueLoading);
+      loadInitialLitElementComponents(continueLoading);
     } else {
       loadInitialPolymerComponents(function(){
         if (window.AppConfig.enableLitElement) {
-          loadInitialLitComponents(continueLoading);
+          loadInitialLitElementComponents(continueLoading);
         } else {
           continueLoading();
         }
@@ -213,21 +224,6 @@
         }
       });
     }
-  }
-
-  function loadWebComponentPolyfill() {
-    var url = 'none';
-    if (window.AppConfig.onlyLitElements) {
-      url = window.AppConfig.deployEndpoint + 'scripts/webcomponentsjs/webcomponents-lite.js';
-    } else {
-      url = window.AppConfig.deployEndpoint + window.AppConfig.componentsPath + 'webcomponentsjs/webcomponents-lite.js';
-    }
-
-    var polyfill = document.createElement('script');
-    polyfill.src = url;
-    polyfill.addEventListener('load', proxyCustomElements);
-    polyfill.addEventListener('error', onScriptLoadError(polyfill.src));
-    document.head.appendChild(polyfill);
   }
 
   function isLoadingInitialPage() {
@@ -348,7 +344,7 @@
   }
 
   function webComponentsSupported() {
-    return window.customElements && 'import' in document.createElement('link') && 'content' in document.createElement('template');
+    return window.customElements && 'content' in document.createElement('template');
   }
 
   function proxyCustomElements() {
@@ -386,7 +382,6 @@
 
       var onNavigation = config.onNavigation || onNavigation;
       var removeSplash = config.removeSplashScreen || removeSplashScreen;
-      var updateCache = config.updateCache || updateCache;
 
       window.Polymer = window.Polymer || {
         dom: config.domMode,
@@ -407,10 +402,6 @@
 
       document.getElementById(config.mainNode).addEventListener('nav-request', onNavigation);
 
-      if (window.applicationCache) {
-        window.applicationCache.addEventListener('updateready', updateCache);
-      }
-
       if (shouldAddCordovaScript(config)) {
         appendCordovaScript();
       }
@@ -420,11 +411,26 @@
       }
     },
     ensureWebComponentsSupport: function() {
-      if (webComponentsSupported()) {
+      if (webComponentsSupported() && window.AppConfig.onlyLitElements) {
         proxyCustomElements();
-      } else {
+      }
+      if (!window.AppConfig.onlyLitElements && !('import' in document.createElement('link'))) {
         loadWebComponentPolyfill();
       }
     }
   };
+  function loadWebComponentPolyfill() {
+    var url = 'none';
+    if (window.AppConfig.onlyLitElements) {
+      url = window.AppConfig.deployEndpoint + 'scripts/webcomponentsjs/webcomponents-lite.js';
+    } else {
+      url = window.AppConfig.deployEndpoint + window.AppConfig.componentsPath + 'webcomponentsjs/webcomponents-lite.js';
+    }
+
+    var polyfill = document.createElement('script');
+    polyfill.src = url;
+    polyfill.addEventListener('load', proxyCustomElements);
+    polyfill.addEventListener('error', onScriptLoadError(polyfill.src));
+    document.head.appendChild(polyfill);
+  }
 })(document);
